@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ANSV · Cuadro de Mando Gestión Documental</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:       #08111e;
+    --bg2:      #0e1c2f;
+    --bg3:      #132437;
+    --card:     #111e30;
+    --border:   #1a3050;
+    --accent:   #00b4d8;
+    --accent2:  #0077b6;
+    --txt:      #e0eaf5;
+    --txt2:     #7a9ab8;
+    --creado:   #22c55e;
+    --modif:    #f59e0b;
+    --elim:     #ef4444;
+    --obs:      #a855f7;
+    --radius:   12px;
+    --shadow:   0 4px 24px rgba(0,0,0,.45);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--txt); font-family:'Segoe UI',system-ui,sans-serif; min-height:100vh; }
+
+  /* ── HEADER ── */
+  header {
+    background: linear-gradient(135deg,#06101a 0%,#0a1828 60%,#0d2040 100%);
+    border-bottom: 2px solid var(--accent);
+    padding: 0 28px;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 68px; position: sticky; top:0; z-index:100;
+    box-shadow: 0 2px 20px rgba(0,180,216,.15);
+  }
+  .logo { display:flex; align-items:center; gap:14px; }
+  .logo-badge {
+    background: linear-gradient(135deg,var(--accent),var(--accent2));
+    color:#fff; font-weight:800; font-size:13px; padding:6px 12px;
+    border-radius:8px; letter-spacing:1px;
+  }
+  .logo-text h1 { font-size:16px; font-weight:700; color:var(--txt); letter-spacing:.3px; }
+  .logo-text p  { font-size:11px; color:var(--txt2); }
+  .header-right { display:flex; align-items:center; gap:20px; }
+  .corte-badge {
+    background:rgba(0,180,216,.1); border:1px solid var(--accent);
+    color:var(--accent); font-size:11px; font-weight:600;
+    padding:5px 12px; border-radius:20px; letter-spacing:.5px;
+  }
+  .total-badge {
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    color:#fff; font-size:13px; font-weight:800;
+    padding:6px 14px; border-radius:20px;
+  }
+
+  /* ── FILTROS ── */
+  .filters-bar {
+    background:var(--bg2); border-bottom:1px solid var(--border);
+    padding:10px 28px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  }
+  .filter-label { font-size:11px; color:var(--txt2); font-weight:600; margin-right:4px; white-space:nowrap; }
+  .filter-btn {
+    background:var(--bg3); border:1px solid var(--border); color:var(--txt2);
+    font-size:11px; font-weight:600; padding:5px 12px; border-radius:20px;
+    cursor:pointer; transition:all .2s; white-space:nowrap;
+  }
+  .filter-btn:hover { border-color:var(--accent); color:var(--accent); }
+  .filter-btn.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .filter-sep { width:1px; height:22px; background:var(--border); }
+  .clear-btn {
+    background:transparent; border:1px solid #ef4444; color:#ef4444;
+    font-size:11px; padding:4px 10px; border-radius:20px; cursor:pointer; transition:all .2s;
+  }
+  .clear-btn:hover { background:#ef4444; color:#fff; }
+
+  /* ── LAYOUT ── */
+  main { padding:20px 28px; display:flex; flex-direction:column; gap:18px; }
+
+  /* ── KPI STRIP ── */
+  .kpi-strip { display:grid; grid-template-columns:repeat(7,1fr); gap:12px; }
+  .kpi {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:var(--radius); padding:14px 16px;
+    display:flex; flex-direction:column; gap:4px;
+    box-shadow:var(--shadow); transition:transform .2s,border-color .2s;
+    position:relative; overflow:hidden; cursor:pointer;
+  }
+  .kpi::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:3px;
+  }
+  .kpi.total::before   { background:var(--accent); }
+  .kpi.creado::before  { background:var(--creado); }
+  .kpi.modif::before   { background:var(--modif); }
+  .kpi.elim::before    { background:var(--elim); }
+  .kpi.obs::before     { background:var(--obs); }
+  .kpi.proc::before    { background:#38bdf8; }
+  .kpi.tdoc::before    { background:#818cf8; }
+  .kpi:hover { transform:translateY(-2px); border-color:var(--accent); }
+  .kpi-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:var(--txt2); }
+  .kpi-value { font-size:30px; font-weight:800; color:var(--txt); line-height:1; }
+  .kpi.creado .kpi-value { color:var(--creado); }
+  .kpi.modif  .kpi-value { color:var(--modif); }
+  .kpi.elim   .kpi-value { color:var(--elim); }
+  .kpi.obs    .kpi-value { color:var(--obs); }
+  .kpi-sub { font-size:10px; color:var(--txt2); }
+
+  /* ── CHARTS GRID ── */
+  .charts-row { display:grid; gap:14px; }
+  .row-3  { grid-template-columns: 1.1fr 1.1fr 1.8fr; }
+  .row-2  { grid-template-columns: 1fr 1fr; }
+  .row-23 { grid-template-columns: 1.2fr 1.8fr; }
+
+  .panel {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:var(--radius); padding:16px 18px;
+    box-shadow:var(--shadow); display:flex; flex-direction:column; gap:10px;
+  }
+  .panel-title {
+    font-size:11px; font-weight:700; text-transform:uppercase;
+    letter-spacing:.8px; color:var(--txt2);
+    display:flex; align-items:center; gap:8px;
+  }
+  .panel-title span.dot {
+    width:8px; height:8px; border-radius:50%; flex-shrink:0;
+  }
+  .chart-wrap { position:relative; flex:1; min-height:0; }
+  canvas { max-width:100% !important; }
+
+  /* ── INSIGHTS ── */
+  .insights-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .insight-card {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:var(--radius); padding:14px 16px;
+    display:flex; gap:12px; align-items:flex-start;
+    box-shadow:var(--shadow);
+  }
+  .insight-icon { font-size:22px; flex-shrink:0; line-height:1; }
+  .insight-body {}
+  .insight-title { font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+  .insight-text  { font-size:12px; color:var(--txt2); line-height:1.5; }
+  .insight-text strong { color:var(--txt); }
+
+  /* ── TABLE ── */
+  .table-wrap { overflow-x:auto; max-height:220px; overflow-y:auto; }
+  table { width:100%; border-collapse:collapse; font-size:11px; }
+  thead th {
+    background:var(--bg3); color:var(--txt2); font-weight:700;
+    text-transform:uppercase; letter-spacing:.5px;
+    padding:8px 10px; position:sticky; top:0; text-align:left;
+    border-bottom:1px solid var(--border);
+  }
+  tbody tr { border-bottom:1px solid rgba(26,48,80,.5); transition:background .15s; }
+  tbody tr:hover { background:rgba(0,180,216,.06); }
+  tbody td { padding:7px 10px; color:var(--txt); }
+  .badge {
+    display:inline-block; padding:2px 8px; border-radius:10px;
+    font-size:10px; font-weight:700; letter-spacing:.3px;
+  }
+  .badge-Creado   { background:rgba(34,197,94,.15);  color:var(--creado); }
+  .badge-Modificado { background:rgba(245,158,11,.15); color:var(--modif); }
+  .badge-Eliminado  { background:rgba(239,68,68,.15);  color:var(--elim); }
+  .badge-Obsoleto   { background:rgba(168,85,247,.15); color:var(--obs); }
+
+  /* ── NO DATA ── */
+  .no-data { display:flex; align-items:center; justify-content:center; height:120px; color:var(--txt2); font-size:13px; }
+
+  /* ── FOOTER ── */
+  footer {
+    text-align:center; padding:12px; font-size:10px; color:var(--txt2);
+    border-top:1px solid var(--border); margin-top:8px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width:6px; height:6px; }
+  ::-webkit-scrollbar-track { background:var(--bg); }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-badge">ANSV</div>
+    <div class="logo-text">
+      <h1>Cuadro de Mando · Gestión Documental</h1>
+      <p>Oficina Asesora de Planeación · Control de Cambios</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="corte-badge">📅 Corte 21/04/2026</span>
+    <span class="total-badge" id="hdr-total">85 documentos</span>
+  </div>
+</header>
+
+<!-- FILTROS -->
+<div class="filters-bar">
+  <span class="filter-label">TIPO:</span>
+  <button class="filter-btn active" data-f="tipo" data-v="todos">Todos</button>
+  <button class="filter-btn" data-f="tipo" data-v="Creado">● Creado</button>
+  <button class="filter-btn" data-f="tipo" data-v="Modificado">● Modificado</button>
+  <button class="filter-btn" data-f="tipo" data-v="Eliminado">● Eliminado</button>
+  <button class="filter-btn" data-f="tipo" data-v="Obsoleto">● Obsoleto</button>
+  <div class="filter-sep"></div>
+  <span class="filter-label">MES:</span>
+  <button class="filter-btn active" data-f="mes" data-v="todos">Todos</button>
+  <button class="filter-btn" data-f="mes" data-v="enero">Enero</button>
+  <button class="filter-btn" data-f="mes" data-v="febrero">Febrero</button>
+  <button class="filter-btn" data-f="mes" data-v="marzo">Marzo</button>
+  <button class="filter-btn" data-f="mes" data-v="abril">Abril</button>
+  <div class="filter-sep"></div>
+  <span class="filter-label">DOC:</span>
+  <select id="sel-tipodoc" style="background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px;padding:5px 10px;border-radius:20px;cursor:pointer;">
+    <option value="todos">Todos los tipos</option>
+    <option>Formato</option><option>Procedimiento</option><option>Plan</option>
+    <option>Documento</option><option>Programa</option><option>Caracterizacion</option><option>Manual</option>
+  </select>
+  <div class="filter-sep"></div>
+  <span class="filter-label">PROCESO:</span>
+  <select id="sel-proceso" style="background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px;padding:5px 10px;border-radius:20px;cursor:pointer;max-width:200px;">
+    <option value="todos">Todos los procesos</option>
+  </select>
+  <div class="filter-sep"></div>
+  <button class="clear-btn" id="btn-clear">✕ Limpiar</button>
+</div>
+
+<main>
+  <!-- KPIs -->
+  <div class="kpi-strip">
+    <div class="kpi total">
+      <div class="kpi-label">Total docs</div>
+      <div class="kpi-value" id="k-total">—</div>
+      <div class="kpi-sub">registros filtrados</div>
+    </div>
+    <div class="kpi creado">
+      <div class="kpi-label">Creados</div>
+      <div class="kpi-value" id="k-creado">—</div>
+      <div class="kpi-sub" id="k-creado-pct"></div>
+    </div>
+    <div class="kpi modif">
+      <div class="kpi-label">Modificados</div>
+      <div class="kpi-value" id="k-modif">—</div>
+      <div class="kpi-sub" id="k-modif-pct"></div>
+    </div>
+    <div class="kpi elim">
+      <div class="kpi-label">Eliminados</div>
+      <div class="kpi-value" id="k-elim">—</div>
+      <div class="kpi-sub" id="k-elim-pct"></div>
+    </div>
+    <div class="kpi obs">
+      <div class="kpi-label">Obsoletos</div>
+      <div class="kpi-value" id="k-obs">—</div>
+      <div class="kpi-sub" id="k-obs-pct"></div>
+    </div>
+    <div class="kpi proc">
+      <div class="kpi-label">Procesos</div>
+      <div class="kpi-value" id="k-proc" style="color:#38bdf8">—</div>
+      <div class="kpi-sub">impactados</div>
+    </div>
+    <div class="kpi tdoc">
+      <div class="kpi-label">Versión prom.</div>
+      <div class="kpi-value" id="k-vers" style="color:#818cf8">—</div>
+      <div class="kpi-sub">promedio</div>
+    </div>
+  </div>
+
+  <!-- FILA 1: Dona + Barras Mes + Barras Proceso -->
+  <div class="charts-row row-3">
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--accent)"></span>Distribución por Tipo</div>
+      <div class="chart-wrap" style="height:200px"><canvas id="c-dona"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--modif)"></span>Actividad Mensual</div>
+      <div class="chart-wrap" style="height:200px"><canvas id="c-mes"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:#38bdf8"></span>Ranking por Proceso</div>
+      <div class="chart-wrap" style="height:200px"><canvas id="c-proc"></canvas></div>
+    </div>
+  </div>
+
+  <!-- FILA 2: Tipo Doc + Versiones -->
+  <div class="charts-row row-23">
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:#818cf8"></span>Tipo de Documento</div>
+      <div class="chart-wrap" style="height:180px"><canvas id="c-tipodoc"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--creado)"></span>Distribución por Versión · Histograma</div>
+      <div class="chart-wrap" style="height:180px"><canvas id="c-version"></canvas></div>
+    </div>
+  </div>
+
+  <!-- INSIGHTS -->
+  <div class="insights-grid" id="insights-grid"></div>
+
+  <!-- TABLA DETALLE -->
+  <div class="panel">
+    <div class="panel-title"><span class="dot" style="background:var(--accent)"></span>Detalle de Documentos · <span id="tbl-count" style="color:var(--txt);font-weight:800"></span></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Tipo</th><th>Código</th><th>Documento</th>
+            <th>Proceso</th><th>Tipo Doc</th><th>Versión</th><th>Mes</th>
+          </tr>
+        </thead>
+        <tbody id="tbl-body"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<footer>ANSV · Agencia Nacional de Seguridad Vial · Sistema de Gestión Documental · Dashboard Interactivo · Corte 21/04/2026 · Solo uso interno</footer>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// DATOS
+// ══════════════════════════════════════════════════════════
+const RAW = [
+  [1,"Creado","ANSV-DOC-PG-06","PROGRAMA GESTIÓN DEL CONOCIMIENTO EN GESTIÓN DOCUMENTAL","Gestión Documental","Programa",0,"enero"],
+  [2,"Creado","ANSV-DOC-PG-07","PROGRAMA DE NORMALIZACIÓN DE FORMAS Y FORMULARIOS ELECTRÓNICOS","Gestión Documental","Programa",0,"febrero"],
+  [3,"Modificado","ANSV-DOC-PL-01","PLAN INSTITUCIONAL DE ARCHIVOS - PINAR","Gestión Documental","Plan",2,"enero"],
+  [4,"Modificado","ANSV-DOC-PL-02","PLAN DE CONSERVACIÓN DOCUMENTAL","Gestión Documental","Plan",1,"enero"],
+  [5,"Modificado","ANSV-DOC-PL-03","PLAN DE PRESERVACIÓN DIGITAL A LARGO PLAZO","Gestión Documental","Plan",2,"enero"],
+  [6,"Creado","ANSV-GAV-CA-01","CARACTERIZACIÓN","Gestión de atención a víctimas por siniestros viales","Caracterizacion",0,"enero"],
+  [7,"Creado","ANSV-GMC-CA-01","CARACTERIZACIÓN DE PROCESO GESTIÓN E IMPLEMENTACIÓN DE MEDIDAS","Gestión e implementación de medidas para el comportamiento de los actores viales","Caracterizacion",0,"marzo"],
+  [8,"Modificado","ANSV-GRF-PG-01","PROGRAMA GESTIÓN INTEGRAL DE RESIDUOS SÓLIDOS Y PELIGROSOS","Gestión de recursos físicos","Programa",1,"febrero"],
+  [9,"Modificado","ANSV-GRF-PL-01","PLAN DE AUSTERIDAD Y SOSTENIBILIDAD AMBIENTAL","Gestión de recursos físicos","Plan",1,"febrero"],
+  [10,"Modificado","ANSV-GTH-PL-01","PLAN DE PREVISIÓN DE RECURSOS HUMANOS","Gestión del Talento Humano","Plan",1,"enero"],
+  [11,"Modificado","ANSV-GTH-PL-02","PLAN DE BIENESTAR SOCIAL E INCENTIVOS","Gestión del Talento Humano","Plan",1,"enero"],
+  [12,"Modificado","ANSV-GTH-PL-03","PLAN ANUAL DE TRABAJO DE SEGURIDAD Y SALUD EN EL TRABAJO","Gestión del Talento Humano","Plan",1,"enero"],
+  [13,"Modificado","ANSV-GTH-PL-04","PLAN ESTRATÉGICO DE TALENTO HUMANO","Gestión del Talento Humano","Plan",1,"enero"],
+  [14,"Modificado","ANSV-GTH-PL-05","PLAN INSTITUCIONAL DE CAPACITACIÓN","Gestión del Talento Humano","Plan",2,"enero"],
+  [15,"Modificado","ANSV-GTH-PL-06","PLAN ANUAL DE VACANTES","Gestión del Talento Humano","Plan",1,"enero"],
+  [16,"Creado","ANSV-GTH-PL-07","PLAN ANUAL DE TRABAJO DEL PLAN ESTRATÉGICO DE SEGURIDAD VIAL","Gestión del Talento Humano","Plan",0,"enero"],
+  [17,"Modificado","ANSV-TIC-PL-01","PLAN DE MANTENIMIENTO DE SERVICIOS TECNOLÓGICOS 2026","Gestión TIC","Plan",1,"febrero"],
+  [18,"Modificado","ANSV-TIC-PL-02","PLAN DE SEGURIDAD 2026","Gestión TIC","Plan",1,"febrero"],
+  [19,"Modificado","ANSV-TIC-PL-03","PLAN DE TRATAMIENTO DE RIESGOS 2026","Gestión TIC","Plan",1,"febrero"],
+  [20,"Modificado","ANSV-TIC-PL-04","PLAN ESTRATEGICO DE TECNOLOGÍAS DE LA INFORMACIÓN 2026","Gestión TIC","Plan",1,"febrero"],
+  [21,"Modificado","ANSV-CID-FO-01","FORMATO AUTO QUE ORDENA DAR TRASLADO PARA ALEGATOS","Control interno disciplinario","Formato",2,"febrero"],
+  [22,"Modificado","ANSV-CID-FO-02","FORMATO AUTO DE APERTURA INDAGACIÓN PREVIA","Control interno disciplinario","Formato",3,"febrero"],
+  [23,"Modificado","ANSV-CID-FO-04","FORMATO EN BLANCO PARA PROCESOS","Control interno disciplinario","Formato",3,"marzo"],
+  [24,"Modificado","ANSV-CID-FO-08","FORMATO NOTIFICACIÓN POR EDICTO","Control interno disciplinario","Formato",3,"marzo"],
+  [25,"Modificado","ANSV-CID-FO-10","FORMATO FALLO PRIMERA INSTANCIA","Control interno disciplinario","Formato",3,"febrero"],
+  [26,"Modificado","ANSV-CID-FO-12","FORMATO AUTO DE ACUMULACIÓN DE PROCESOS","Control interno disciplinario","Formato",3,"febrero"],
+  [27,"Modificado","ANSV-CID-FO-14","FORMATO AUTO DE ARCHIVO","Control interno disciplinario","Formato",4,"marzo"],
+  [28,"Modificado","ANSV-CID-FO-15","FORMATO AUTO QUE ORDENA PRÁCTICA DE PRUEBAS","Control interno disciplinario","Formato",3,"febrero"],
+  [29,"Modificado","ANSV-CID-FO-20","ACTA DE POSESIÓN DEFENSOR DE OFICIO","Control interno disciplinario","Formato",5,"marzo"],
+  [30,"Modificado","ANSV-CID-FO-22","CITACIÓN NOTIFICACIÓN PERSONAL","Control interno disciplinario","Formato",4,"marzo"],
+  [31,"Modificado","ANSV-CID-FO-23","FORMATO AUTO INHIBITORIO","Control interno disciplinario","Formato",2,"febrero"],
+  [32,"Modificado","ANSV-CID-FO-27","FORMATO NOTIFICACIÓN POR ESTADO","Control interno disciplinario","Formato",3,"marzo"],
+  [33,"Modificado","ANSV-CID-FO-31","FORMATO ACTA DE AUDIENCIA PROCESO VERBAL","Control interno disciplinario","Formato",2,"febrero"],
+  [34,"Modificado","ANSV-CID-FO-32","AUTO QUE ORDENA FIJAR EL JUZGAMIENTO POR JUICIO VERBAL","Control interno disciplinario","Formato",2,"febrero"],
+  [35,"Modificado","ANSV-CID-FO-33","MATRIZ CONTROL DE EXPEDIENTES DISCIPLINARIOS","Control interno disciplinario","Formato",3,"marzo"],
+  [36,"Modificado","ANSV-CID-FO-36","FORMATO AUTO DE IMPEDIMENTO","Control interno disciplinario","Formato",1,"febrero"],
+  [37,"Modificado","ANSV-CID-FO-37","FORMATO AUTO DE RECUSACION","Control interno disciplinario","Formato",1,"febrero"],
+  [38,"Modificado","ANSV-CID-FO-38","FORMATO AUTO PLIEGO DE CARGOS","Control interno disciplinario","Formato",1,"febrero"],
+  [39,"Modificado","ANSV-CID-FO-39","FORMATO AUTO QUE RESUELVE EL RECURSO DE REPOSICIÓN","Control interno disciplinario","Formato",1,"febrero"],
+  [40,"Modificado","ANSV-CID-FO-40","FORMATO AUTO PRORROGA EL TÉRMINO","Control interno disciplinario","Formato",1,"febrero"],
+  [41,"Modificado","ANSV-CID-FO-42","AUTO QUE DECIDE SOBRE ADMISIÓN DEL RECURSO DE APELACIÓN","Control interno disciplinario","Formato",1,"febrero"],
+  [42,"Modificado","ANSV-CID-FO-43","AUTO VARIACION DE CARGOS","Control interno disciplinario","Formato",1,"febrero"],
+  [43,"Modificado","ANSV-CID-FO-44","AUTO QUE ORDENA FIJAR JUZGAMIENTO ORDINARIO","Control interno disciplinario","Formato",1,"febrero"],
+  [44,"Modificado","ANSV-CID-FO-45","FORMATO AUTO DE CIERRE DE INVESTIGACIÓN DISCIPLINARIA","Control interno disciplinario","Formato",2,"febrero"],
+  [45,"Modificado","ANSV-CID-FO-46","AUTO NULIDAD DE LA ACTUACIÓN DISCIPLINARIA","Control interno disciplinario","Formato",1,"febrero"],
+  [46,"Modificado","ANSV-CON-PR-15","PROCEDIMIENTO PARA COMPRAS A TRAVÉS DE LA TIENDA VIRTUAL","Gestión Contractual","Procedimiento",2,"febrero"],
+  [47,"Creado","ANSV-CPP-PR-07","PROCEDIMIENTO ESTRATEGIAS INTERINSTITUCIONALES","Coordinación y articulación para la implementación de la política pública en seguridad vial","Procedimiento",0,"enero"],
+  [48,"Creado","ANSV-CPP-PR-08","PROCEDIMIENTO ARTICULACIÓN INSTANCIAS TERRITORIALES","Coordinación y articulación para la implementación de la política pública en seguridad vial","Procedimiento",0,"enero"],
+  [49,"Modificado","ANSV-DOC-FO-02","FORMATO ÚNICO DE INVENTARIO DOCUMENTAL (FUID)","Gestión Documental","Formato",2,"marzo"],
+  [50,"Modificado","ANSV-DOC-FO-20","FORMATO LISTA DE DOCUMENTOS VITALES","Gestión Documental","Formato",2,"febrero"],
+  [51,"Modificado","ANSV-FIN-MG-01","MANUAL REPORTE PRIMA SOAT - FONDO NACIONAL","Gestión financiera","Manual",2,"marzo"],
+  [52,"Modificado","ANSV-FIN-PR-05","PROCEDIMIENTO EXPEDICIÓN CDP","Gestión financiera","Procedimiento",4,"marzo"],
+  [53,"Modificado","ANSV-FIN-PR-22","PROCEDIMIENTO EXPEDICIÓN RP","Gestión financiera","Procedimiento",1,"marzo"],
+  [54,"Creado","ANSV-FIN-PR-23","PROCEDIMIENTO EXPEDICIÓN CDR","Gestión financiera","Procedimiento",0,"marzo"],
+  [55,"Creado","ANSV-GAV-FO-01","FORMATO MATRIZ DE SOLICITUDES Y SEGUIMIENTO ASISTENCIAS","Gestión de atención a víctimas por siniestros viales","Formato",0,"febrero"],
+  [56,"Creado","ANSV-GAV-PR-02","PROCEDIMIENTO PARA EL DESARROLLO DE ASISTENCIAS TÉCNICAS","Gestión de atención a víctimas por siniestros viales","Procedimiento",0,"marzo"],
+  [57,"Modificado","ANSV-GMC-FO-09","LISTADO CARACTERIZACIÓN ASISTENTES ACTIVIDADES VIRTUALES","Gestión e implementación de medidas para el comportamiento de los actores viales","Formato",1,"abril"],
+  [58,"Modificado","ANSV-GRF-MG-01","MANUAL ADMINISTRACIÓN DE BIENES","Gestión de recursos físicos","Manual",5,"febrero"],
+  [59,"Modificado","ANSV-GRF-PR-01","PROCEDIMIENTO INGRESO Y SALIDA DE ALMACÉN","Gestión de recursos físicos","Procedimiento",8,"febrero"],
+  [60,"Creado","ANSV-GRF-PR-15","PROCEDIMIENTO IDENTIFICACIÓN ASPECTOS E IMPACTOS AMBIENTALES","Gestión de recursos físicos","Procedimiento",0,"marzo"],
+  [61,"Modificado","ANSV-GTH-PR-03","PROCEDIMIENTO DE LIQUIDACIÓN DE NÓMINA","Gestión del Talento Humano","Procedimiento",4,"marzo"],
+  [62,"Modificado","ANSV-JUR-FO-16","FORMATO REGISTRO Y CONTROL DE ACCIONES DE TUTELA","Gestión Jurídica","Formato",2,"enero"],
+  [63,"Modificado","ANSV-JUR-PR-03","PROCEDIMIENTO CONCILIACIÓN PREJUDICIAL","Gestión Jurídica","Procedimiento",4,"enero"],
+  [64,"Modificado","ANSV-PDE-DO-12","INFORMES SEGUIMIENTO A LA ADMINISTRACIÓN DEL RIESGO ANSV","Planeación y Direccionamiento Estratégico","Documento",13,"febrero"],
+  [65,"Creado","ANSV-PDE-DO-16","INFORME SEGUIMIENTO PLANES DE MEJORAMIENTO","Planeación y Direccionamiento Estratégico","Documento",0,"marzo"],
+  [66,"Modificado","ANSV-PDE-FO-46","FORMATO FORMULACIÓN DEL PLAN DE ACCIÓN","Planeación y Direccionamiento Estratégico","Formato",2,"marzo"],
+  [67,"Modificado","ANSV-SAC-FO-05","TRATAMIENTO DENUNCIAS PRESUNTOS ACTOS DE CORRUPCIÓN","Gestión atención al ciudadano","Formato",1,"febrero"],
+  [68,"Modificado","ANSV-SAC-FO-06","FORMATO SEGUIMIENTO SUGERENCIAS EXPERIENCIA CIUDADANA","Gestión atención al ciudadano","Formato",1,"febrero"],
+  [69,"Modificado","ANSV-SAC-FO-07","FORMATO REGISTRO DE ATENCIÓN CANAL PRESENCIAL Y TELEFÓNICO","Gestión atención al ciudadano","Formato",1,"febrero"],
+  [70,"Modificado","ANSV-SAC-FO-08","EVALUACIÓN EXPERIENCIA CIUDADANA - EVENTOS","Gestión atención al ciudadano","Formato",1,"febrero"],
+  [71,"Modificado","ANSV-SAC-PR-01","PROCEDIMIENTO PARA LA RECEPCIÓN, TRÁMITE Y CONTROL DE PETICIONES","Gestión atención al ciudadano","Procedimiento",4,"enero"],
+  [72,"Modificado","ANSV-TIC-FO-12","FORMATO DOCUMENTO DE ARQUITECTURA DE SOFTWARE","Gestión TIC","Formato",1,"abril"],
+  [73,"Eliminado","ANSV-CPP-FO-01","MATRIZ SEGUIMIENTO COMPROMISOS COMITES LOCALES","Coordinación y articulación para la implementación de la política pública en seguridad vial","Formato",0,"enero"],
+  [74,"Eliminado","ANSV-CPP-FO-02","MATRIZ DE SEGUIMIENTO COMPROMISOS CONSEJOS TERRITORIALES","Coordinación y articulación para la implementación de la política pública en seguridad vial","Formato",0,"enero"],
+  [75,"Eliminado","ANSV-CPP-FO-03","PLAN DE TRABAJO LINEA SECTORIAL","Coordinación y articulación para la implementación de la política pública en seguridad vial","Formato",0,"enero"],
+  [76,"Eliminado","ANSV-CPP-PR-03","PROCEDIMIENTO COMITE DEPARTAMENTAL Y LOCAL DE SEGURIDAD VIAL","Coordinación y articulación para la implementación de la política pública en seguridad vial","Procedimiento",0,"enero"],
+  [77,"Eliminado","ANSV-CPP-PR-04","PROCEDIMIENTO CONSEJOS TERRITORIALES DE SEGURIDAD VIAL","Coordinación y articulación para la implementación de la política pública en seguridad vial","Procedimiento",0,"enero"],
+  [78,"Eliminado","ANSV-CPP-PR-05","PROCEDIMIENTO ACUERDO DE ENTENDIMIENTO","Coordinación y articulación para la implementación de la política pública en seguridad vial","Procedimiento",0,"enero"],
+  [79,"Eliminado","ANSV-DOC-DO-03","PROGRAMA DE GESTION DOCUMENTAL","Gestión Documental","Documento",3,"febrero"],
+  [80,"Eliminado","ANSV-FIN-FO-40","CAUSACIÓN INGRESO SOAT","Gestión financiera","Formato",0,"marzo"],
+  [81,"Eliminado","ANSV-FIN-PR-17","PROCEDIMIENTO DE LIBERACION DE SALDOS PRESUPUESTO","Gestión financiera","Procedimiento",0,"marzo"],
+  [82,"Eliminado","ANSV-FIN-PR-18","PROCEDIMIENTO ANULACION DE CERTIFICADOS","Gestión financiera","Procedimiento",0,"marzo"],
+  [83,"Eliminado","ANSV-GAV-DO-01","CARACTERIZACIÓN GRUPO ATENCIÓN VÍCTIMAS","Gestión de atención a víctimas por siniestros viales","Documento",1,"enero"],
+  [84,"Eliminado","ANSV-TIC-PR-06","PROCEDIMIENTO GESTION INCIDENTES SEGURIDAD INFORMACIÓN","Gestión TIC","Procedimiento",1,"enero"],
+  [85,"Obsoleto","ANSV-GTH-PL-05","PLAN INSTITUCIONAL DE CAPACITACIÓN","Gestión del Talento Humano","Plan",1,"enero"],
+];
+const COLS = {no:0,tipo:1,cod:2,doc:3,proc:4,tdoc:5,ver:6,mes:7};
+const MESES_ORD = ["enero","febrero","marzo","abril"];
+const TIPO_C = {Creado:"#22c55e",Modificado:"#f59e0b",Eliminado:"#ef4444",Obsoleto:"#a855f7"};
+
+// ══════════════════════════════════════════════════════════
+// ESTADO DE FILTROS
+// ══════════════════════════════════════════════════════════
+const F = { tipo:"todos", mes:"todos", tipodoc:"todos", proceso:"todos" };
+
+// Poblar select de procesos
+const procesos = [...new Set(RAW.map(r=>r[COLS.proc]))].sort();
+const selProc = document.getElementById("sel-proceso");
+procesos.forEach(p => {
+  const o = document.createElement("option"); o.value=p;
+  o.textContent = p.length>35 ? p.slice(0,33)+"…" : p;
+  selProc.appendChild(o);
+});
+
+// ══════════════════════════════════════════════════════════
+// FILTRADO
+// ══════════════════════════════════════════════════════════
+function filtered(){
+  return RAW.filter(r =>
+    (F.tipo==="todos"    || r[COLS.tipo]===F.tipo) &&
+    (F.mes==="todos"     || r[COLS.mes]===F.mes) &&
+    (F.tipodoc==="todos" || r[COLS.tdoc]===F.tipodoc) &&
+    (F.proceso==="todos" || r[COLS.proc]===F.proceso)
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// CHARTS
+// ══════════════════════════════════════════════════════════
+const CHART_DEFAULTS = {
+  plugins:{ legend:{ labels:{ color:"#7a9ab8", font:{size:11}, boxWidth:12 } } },
+  scales:{
+    x:{ ticks:{color:"#7a9ab8",font:{size:10}}, grid:{color:"rgba(26,48,80,.4)"} },
+    y:{ ticks:{color:"#7a9ab8",font:{size:10}}, grid:{color:"rgba(26,48,80,.4)"} }
+  }
+};
+
+let charts = {};
+function initCharts(){
+  const ctxs = {
+    dona:   document.getElementById("c-dona").getContext("2d"),
+    mes:    document.getElementById("c-mes").getContext("2d"),
+    proc:   document.getElementById("c-proc").getContext("2d"),
+    tipodoc:document.getElementById("c-tipodoc").getContext("2d"),
+    version:document.getElementById("c-version").getContext("2d"),
+  };
+
+  // DONA
+  charts.dona = new Chart(ctxs.dona,{
+    type:"doughnut",
+    data:{ labels:["Modificado","Creado","Eliminado","Obsoleto"], datasets:[{data:[0,0,0,0], backgroundColor:["#f59e0b","#22c55e","#ef4444","#a855f7"], borderWidth:0, hoverOffset:6}] },
+    options:{ cutout:"68%", plugins:{ legend:{position:"bottom",labels:{color:"#7a9ab8",font:{size:10},boxWidth:10,padding:8}}, tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.parsed} (${Math.round(ctx.parsed/ctx.dataset.data.reduce((a,b)=>a+b,0)*100)}%)`}} }, animation:{duration:400} }
+  });
+
+  // MENSUAL apilada
+  charts.mes = new Chart(ctxs.mes,{
+    type:"bar",
+    data:{
+      labels:MESES_ORD.map(m=>m.charAt(0).toUpperCase()+m.slice(1)),
+      datasets:[
+        {label:"Creado",    data:[0,0,0,0], backgroundColor:"#22c55e", borderRadius:3},
+        {label:"Modificado",data:[0,0,0,0], backgroundColor:"#f59e0b", borderRadius:3},
+        {label:"Eliminado", data:[0,0,0,0], backgroundColor:"#ef4444", borderRadius:3},
+        {label:"Obsoleto",  data:[0,0,0,0], backgroundColor:"#a855f7", borderRadius:3},
+      ]
+    },
+    options:{ ...CHART_DEFAULTS, responsive:true, maintainAspectRatio:false,
+      scales:{x:{stacked:true,ticks:{color:"#7a9ab8",font:{size:10}},grid:{color:"rgba(26,48,80,.4)"}}, y:{stacked:true,ticks:{color:"#7a9ab8",font:{size:10}},grid:{color:"rgba(26,48,80,.4)"}}},
+      plugins:{legend:{position:"bottom",labels:{color:"#7a9ab8",font:{size:10},boxWidth:10,padding:6}}},
+      animation:{duration:350}
+    }
+  });
+
+  // PROCESO barras horiz
+  charts.proc = new Chart(ctxs.proc,{
+    type:"bar",
+    data:{ labels:[], datasets:[{label:"Documentos",data:[], backgroundColor:"#0ea5e9", borderRadius:4}] },
+    options:{
+      indexAxis:"y", responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{ticks:{color:"#7a9ab8",font:{size:9}}, grid:{color:"rgba(26,48,80,.4)"}},
+        y:{ticks:{color:"#7a9ab8",font:{size:9}, callback:v=>v.length>22?v.slice(0,20)+"…":v}, grid:{color:"rgba(26,48,80,.0)"}}
+      },
+      plugins:{legend:{display:false}}, animation:{duration:350}
+    }
+  });
+
+  // TIPO DOC
+  charts.tipodoc = new Chart(ctxs.tipodoc,{
+    type:"bar",
+    data:{ labels:[], datasets:[{label:"Docs",data:[], backgroundColor:["#818cf8","#60a5fa","#34d399","#f472b6","#fbbf24","#a78bfa","#4ade80"], borderRadius:4}] },
+    options:{
+      indexAxis:"y", responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{ticks:{color:"#7a9ab8",font:{size:10}},grid:{color:"rgba(26,48,80,.4)"}},
+        y:{ticks:{color:"#7a9ab8",font:{size:10}},grid:{display:false}}
+      },
+      plugins:{legend:{display:false}}, animation:{duration:350}
+    }
+  });
+
+  // VERSIÓN histograma
+  charts.version = new Chart(ctxs.version,{
+    type:"bar",
+    data:{ labels:["v0","v1","v2","v3","v4","v5","v6+"],
+      datasets:[{label:"Documentos",data:[0,0,0,0,0,0,0],
+        backgroundColor:ctx=>{ const v=ctx.dataIndex; return `hsl(${200+v*18},80%,${55-v*3}%)`; },
+        borderRadius:5
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      scales:{x:{ticks:{color:"#7a9ab8",font:{size:10}},grid:{color:"rgba(26,48,80,.4)"}},
+              y:{ticks:{color:"#7a9ab8",font:{size:10}},grid:{color:"rgba(26,48,80,.4)"}}},
+      plugins:{legend:{display:false}}, animation:{duration:350}
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// UPDATE
+// ══════════════════════════════════════════════════════════
+function update(){
+  const data = filtered();
+  const n = data.length;
+
+  // KPIs
+  const cnt = t => data.filter(r=>r[COLS.tipo]===t).length;
+  const c=cnt("Creado"), m=cnt("Modificado"), e=cnt("Eliminado"), o=cnt("Obsoleto");
+  const procs = new Set(data.map(r=>r[COLS.proc])).size;
+  const avgV  = n ? (data.reduce((s,r)=>s+r[COLS.ver],0)/n).toFixed(1) : "—";
+  const pct = v => n ? `${Math.round(v/n*100)}% del total` : "—";
+
+  document.getElementById("k-total").textContent   = n;
+  document.getElementById("k-creado").textContent  = c;
+  document.getElementById("k-modif").textContent   = m;
+  document.getElementById("k-elim").textContent    = e;
+  document.getElementById("k-obs").textContent     = o;
+  document.getElementById("k-proc").textContent    = procs;
+  document.getElementById("k-vers").textContent    = avgV;
+  document.getElementById("k-creado-pct").textContent = pct(c);
+  document.getElementById("k-modif-pct").textContent  = pct(m);
+  document.getElementById("k-elim-pct").textContent   = pct(e);
+  document.getElementById("k-obs-pct").textContent    = pct(o);
+  document.getElementById("hdr-total").textContent    = `${n} documentos`;
+
+  // Dona
+  charts.dona.data.datasets[0].data = [m,c,e,o];
+  charts.dona.update();
+
+  // Mensual
+  MESES_ORD.forEach((mes,i)=>{
+    const sub = data.filter(r=>r[COLS.mes]===mes);
+    ["Creado","Modificado","Eliminado","Obsoleto"].forEach((t,j)=>{
+      charts.mes.data.datasets[j].data[i] = sub.filter(r=>r[COLS.tipo]===t).length;
+    });
+  });
+  charts.mes.update();
+
+  // Proceso top 10
+  const procCount = {};
+  data.forEach(r=>{ procCount[r[COLS.proc]]=(procCount[r[COLS.proc]]||0)+1; });
+  const procSorted = Object.entries(procCount).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const abrev = s => s.replace("Gestión","Gest.").replace("Coordinación y articulación para la implementación de la política pública en seguridad vial","Coord. Política Pública SV").replace("Planeación y Direccionamiento Estratégico","Planeación Estratégica").replace("implementación de medidas para el comportamiento de los actores viales","Implementación Medidas SV");
+  charts.proc.data.labels  = procSorted.map(([k])=>abrev(k));
+  charts.proc.data.datasets[0].data = procSorted.map(([,v])=>v);
+  charts.proc.update();
+
+  // Tipo doc
+  const tdCount = {};
+  data.forEach(r=>{ tdCount[r[COLS.tdoc]]=(tdCount[r[COLS.tdoc]]||0)+1; });
+  const tdSorted = Object.entries(tdCount).sort((a,b)=>b[1]-a[1]);
+  charts.tipodoc.data.labels = tdSorted.map(([k])=>k);
+  charts.tipodoc.data.datasets[0].data = tdSorted.map(([,v])=>v);
+  charts.tipodoc.update();
+
+  // Versión histograma
+  const vBins = [0,0,0,0,0,0,0]; // 0,1,2,3,4,5,6+
+  data.forEach(r=>{ const v=r[COLS.ver]; vBins[Math.min(v,6)]++; });
+  charts.version.data.datasets[0].data = vBins;
+  charts.version.update();
+
+  // Tabla
+  renderTable(data);
+
+  // Insights
+  renderInsights(data, n, c, m, e, o, procs);
+}
+
+// ══════════════════════════════════════════════════════════
+// TABLA
+// ══════════════════════════════════════════════════════════
+function renderTable(data){
+  document.getElementById("tbl-count").textContent = `${data.length} registros`;
+  const tbody = document.getElementById("tbl-body");
+  tbody.innerHTML = data.slice(0,50).map((r,i)=>`
+    <tr>
+      <td style="color:var(--txt2)">${i+1}</td>
+      <td><span class="badge badge-${r[COLS.tipo]}">${r[COLS.tipo]}</span></td>
+      <td style="color:var(--accent);font-weight:600;font-size:10px">${r[COLS.cod]}</td>
+      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r[COLS.doc]}">${r[COLS.doc]}</td>
+      <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--txt2);font-size:10px" title="${r[COLS.proc]}">${r[COLS.proc]}</td>
+      <td style="color:var(--txt2);font-size:10px">${r[COLS.tdoc]}</td>
+      <td style="text-align:center;font-weight:700">${r[COLS.ver]}</td>
+      <td style="color:var(--txt2);font-size:10px;text-transform:capitalize">${r[COLS.mes]}</td>
+    </tr>`).join("");
+  if(data.length>50) tbody.innerHTML += `<tr><td colspan="8" style="text-align:center;color:var(--txt2);padding:10px;font-size:11px">… y ${data.length-50} registros más</td></tr>`;
+}
+
+// ══════════════════════════════════════════════════════════
+// INSIGHTS
+// ══════════════════════════════════════════════════════════
+function renderInsights(data,n,c,m,e,o,procs){
+  const grid = document.getElementById("insights-grid");
+  if(!n){ grid.innerHTML=`<div class="insight-card" style="grid-column:1/-1"><div class="insight-icon">🔍</div><div class="insight-body"><div class="insight-title">Sin datos</div><div class="insight-text">No hay registros con los filtros actuales.</div></div></div>`; return; }
+
+  // Proceso dominante
+  const pcnt={}; data.forEach(r=>pcnt[r[COLS.proc]]=(pcnt[r[COLS.proc]]||0)+1);
+  const topProc = Object.entries(pcnt).sort((a,b)=>b[1]-a[1])[0];
+  const topProcAbrev = topProc[0].length>40 ? topProc[0].slice(0,38)+"…" : topProc[0];
+
+  // Mes más activo
+  const mcnt={}; data.forEach(r=>mcnt[r[COLS.mes]]=(mcnt[r[COLS.mes]]||0)+1);
+  const topMes = Object.entries(mcnt).sort((a,b)=>b[1]-a[1])[0];
+
+  // Mayor versión
+  const maxVer = data.reduce((a,r)=>r[COLS.ver]>a[COLS.ver]?r:a, data[0]);
+
+  // Proceso con más eliminaciones
+  const ecnt={}; data.filter(r=>r[COLS.tipo]==="Eliminado").forEach(r=>ecnt[r[COLS.proc]]=(ecnt[r[COLS.proc]]||0)+1);
+  const topElim = Object.entries(ecnt).sort((a,b)=>b[1]-a[1])[0];
+
+  // Tipo doc predominante
+  const tdcnt={}; data.forEach(r=>tdcnt[r[COLS.tdoc]]=(tdcnt[r[COLS.tdoc]]||0)+1);
+  const topTD = Object.entries(tdcnt).sort((a,b)=>b[1]-a[1])[0];
+
+  // % modificados
+  const pctMod = Math.round(m/n*100);
+
+  const insights = [
+    { icon:"🏆", title:"Proceso más activo", color:"#f59e0b",
+      text:`<strong>${topProcAbrev}</strong> concentra <strong>${topProc[1]}</strong> de ${n} documentos (<strong>${Math.round(topProc[1]/n*100)}%</strong>).` },
+    { icon:"📅", title:"Mes con mayor actividad", color:"#00b4d8",
+      text:`<strong>${topMes ? topMes[0].charAt(0).toUpperCase()+topMes[0].slice(1) : "—"}</strong> fue el mes más activo con <strong>${topMes?topMes[1]:0}</strong> cambios documentales registrados.` },
+    { icon:"✏️", title:"Peso de modificaciones", color:"#f59e0b",
+      text:`Las modificaciones representan el <strong>${pctMod}%</strong> del total (<strong>${m}</strong> docs), lo que refleja intensa actividad de actualización.` },
+    topElim
+      ? { icon:"⚠️", title:"Alerta: Eliminaciones", color:"#ef4444",
+          text:`<strong>${topElim[0].length>35?topElim[0].slice(0,33)+"…":topElim[0]}</strong> concentra <strong>${topElim[1]}</strong> eliminaciones. Posible reestructuración de procesos.` }
+      : { icon:"✅", title:"Sin eliminaciones", color:"#22c55e",
+          text:`No hay documentos eliminados en la selección actual.` },
+    { icon:"📋", title:"Tipo documental líder", color:"#818cf8",
+      text:`<strong>${topTD?topTD[0]:"—"}</strong> es el tipo predominante con <strong>${topTD?topTD[1]:0}</strong> documentos (<strong>${topTD?Math.round(topTD[1]/n*100):0}%</strong>).` },
+    maxVer
+      ? { icon:"🔄", title:"Mayor madurez documental", color:"#a855f7",
+          text:`Versión más alta: <strong>v${maxVer[COLS.ver]}</strong> — <em>${maxVer[COLS.doc].slice(0,50)}…</em>` }
+      : { icon:"🆕", title:"Documentos nuevos", color:"#22c55e",
+          text:`<strong>${c}</strong> documentos son nuevos (v0) en el período seleccionado.` }
+  ];
+
+  grid.innerHTML = insights.map(ins=>`
+    <div class="insight-card">
+      <div class="insight-icon">${ins.icon}</div>
+      <div class="insight-body">
+        <div class="insight-title" style="color:${ins.color}">${ins.title}</div>
+        <div class="insight-text">${ins.text}</div>
+      </div>
+    </div>`).join("");
+}
+
+// ══════════════════════════════════════════════════════════
+// EVENTOS FILTROS
+// ══════════════════════════════════════════════════════════
+document.querySelectorAll(".filter-btn").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    const field = btn.dataset.f;
+    const val   = btn.dataset.v;
+    F[field] = val;
+    // Actualizar botones activos del grupo
+    document.querySelectorAll(`.filter-btn[data-f="${field}"]`).forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    update();
+  });
+});
+
+document.getElementById("sel-tipodoc").addEventListener("change",e=>{
+  F.tipodoc = e.target.value; update();
+});
+document.getElementById("sel-proceso").addEventListener("change",e=>{
+  F.proceso = e.target.value; update();
+});
+document.getElementById("btn-clear").addEventListener("click",()=>{
+  F.tipo="todos"; F.mes="todos"; F.tipodoc="todos"; F.proceso="todos";
+  document.querySelectorAll(".filter-btn").forEach(b=>b.classList.remove("active"));
+  document.querySelectorAll(".filter-btn[data-v='todos']").forEach(b=>b.classList.add("active"));
+  document.getElementById("sel-tipodoc").value="todos";
+  document.getElementById("sel-proceso").value="todos";
+  update();
+});
+
+// ══════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════
+initCharts();
+update();
+</script>
+</body>
+</html>
